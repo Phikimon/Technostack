@@ -2,7 +2,7 @@
 #define STACK_HPP_INCLUDED
 
 #include <string.h>
-#include "Common/Common.hpp"
+#include "Common.hpp"
 
 enum { INIT_SIZE = 32 };
 Govnocode // Replace with class' const static field

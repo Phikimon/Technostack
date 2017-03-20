@@ -9,15 +9,15 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 set ( SRCPATH "./Source/" )
 
-include_directories( ${SRCPATH} ../Compiler/Source)
+include_directories( ${SRCPATH} )
 
 project(PhikiCompiler)
 
 set     (STACK_SOURCE_FILES
 
     
-        ../Compiler/${SRCPATH}Common/Common.hpp
-        ../Compiler/${SRCPATH}Common/Common.cpp
+        ${SRCPATH}Common.hpp
+        ${SRCPATH}Common.cpp
         ${SRCPATH}Stack.cpp
         ${SRCPATH}Stack.hpp
 	)

@@ -43,7 +43,8 @@ void stackUnitTest()
         Stack<T> stk1; 
         stackTorture<T>(stk1);
         //----------------------------------
-        Stack<T> stk2 = stk;
+        Stack<T> stk2;
+        stk2 = stk;
         stk2.dump();
         stk2.push(255);
         stk2.dump();

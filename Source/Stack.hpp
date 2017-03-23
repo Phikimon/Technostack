@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <typeinfo>
 
+#define NDEBUG
+
 //This enum is put off the class because otherwise
 //how shall I catch throws?
 enum STACKERRORS_T
@@ -34,7 +36,7 @@ public:
     const Stack& operator = (const Stack& stk);
     
     Stack(size_t size = init_size);
-    Stack(Stack& stk);
+    explicit Stack(const Stack& stk);
    ~Stack();
 
     void push(T value);
@@ -42,7 +44,7 @@ public:
     void dump() const;
     
 private:
-    void DSSrealloc();  //Dump, Stupid, Slow realloc(because of no cstdlib)
+    void DSSrealloc();  //Dumb, Stupid, Slow realloc(because of no cstdlib)
     void verify() const;
     void swap(Stack& stk);
 
@@ -70,7 +72,7 @@ Stack<T>::Stack(size_t size):
 }
 
 template <typename T>
-Stack<T>::Stack(Stack& stk)
+Stack<T>::Stack(const Stack& stk)
 {
     count_ = stk.count_;
     currentSize_ = stk.currentSize_;
@@ -99,12 +101,10 @@ void Stack<T>::swap(Stack& stk)
 template <typename T>
 const Stack<T>& Stack<T>::operator = (const Stack& stk)
 {
-    printf("QQQQQQQQ");
-    if (this == &stk) return this;
+    if (this == &stk) return *this;
 
-    printf("!!!!!!!!!!!!!!!!!!!!!!!!\n");
     //Copy and swap idiom
-    Stack<T>& victim = Stack(stk);
+    Stack<T> victim(stk);
     swap(victim);
 
     return *this;

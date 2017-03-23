@@ -1,95 +1,171 @@
-#ifndef STACK_HPP_INCLUDED
-#define STACK_HPP_INCLUDED
+#include <iostream>
+#include <iomanip>
+#include <algorithm>
+#include <typeinfo>
 
-#include <string.h>
-#include "Common.hpp"
-
-enum { INIT_SIZE = 32 };
-Govnocode // Replace with class' const static field
-
+//This enum is put off the class because otherwise
+//how shall I catch throws?
 enum STACKERRORS_T
 {
-    STACKERR_OK              =  0, //< No error occured
-    STACKERR_COMMON          = -1, //< Non-specified error occured
-    STACKERR_CANARY          = -2, //< One of the canaries has wrong value
-    STACKERR_NOPOP           = -3, //< Nothing to pop
-    STACKERR_CHECKSUM        = -4, //< Check sum is incorrect
-    STACKERR_NULLDATAPTRPTR  = -5, //< datasArray_    pointer is NULL
-    STACKERR_NULLCANPTR      = -6, //< canary_        pointer is NULL
-    STACKERR_NULLSEEDPTR     = -7, //< seed_          pointer is NULL
-    STACKERR_NULLDATAPTR     = -8, //< datasArray_[i] pointer is NULL
-    STACKERR_ARRSALLOCATED   = -9, //< number of allocated arrays < arrays quantity
+//TODO:
+//Sorry, Klim, but I still don't know how to use exceptions
+//correctly, so in this prototype I throw enum-s
+    ERR_OK,          //< No error occured
+    ERR_COMMON,      //< Non-specified error occured
+    ERR_UNDERFLOW,   //< Nothing to pop
+    ERR_OVERFLOW,    //< Size_t overflow
+    ERR_ALLOC,       //< Failed to allocate dynamic memory
+    ERR_DATANULLPTR, //< data_ is null-pointer
 };
 
-#define stackDump(stk)                    \
-{                                         \
-    assert(strlen(#stk) <= MAX_LINE_LEN); \
-    stk._dump(#stk);                      \
-}
+template <typename T>
+class Stack;
 
-#define PROP_SET(type, varName)                         \
-    void set_##varName(type val) { varName##_ = val;  };
+template <typename T>
+void stackTorture(Stack<T>&);
 
-#define PROP_GET(type, varName)                         \
-    type get_##varName() const   { return varName##_; };
+template <typename T>
+void stackUnitTest();
 
-#define PROPERTIES
-
+template <typename T>
 class Stack
 {
-    public:
-        Stack();
-        ~Stack();
-        STACKERRORS_T push(double value);
-        double        pop ();
-        double        peek() const;
-        //dump is in private section, because there is a macro to call it
-        STACKERRORS_T _dump(const char stackName[MAX_LINE_LEN] = "name") const;
-    PROPERTIES
-        PROP_GET(size_t, count)
-    private:
+public:
+    const Stack& operator = (const Stack& stk);
+    
+    Stack(size_t size = init_size);
+    Stack(Stack& stk);
+   ~Stack();
 
-        double** datasArray_;     //< array of pointers to arrays
-        size_t** canary_;         //< array of pointers to canaries
-        int*     seed_;           //< are used to generate canaries' values
-        size_t datasArraySize_;   //< current size of 'datasArray_' array
-        size_t canarySize_;       //< current size of 'canary_' array
-        size_t arraysQt_;         //< quantity of currently allocated arrays in datasArray_
-        size_t currentArraySize_; //< size of currently used array
-        double* currentArray_;    //< pointer to the first cell
-        size_t numberOfAllocatedArrays_;//< Number of arrays, memory for which is allocated
+    void push(T value);
+    T    pop ();
+    void dump() const;
+    
+private:
+    void DSSrealloc();  //Dump, Stupid, Slow realloc(because of no cstdlib)
+    void verify() const;
+    void swap(Stack& stk);
 
-/*               ┌───────────┬───────────┬───────────┬───────────┐
- * datasArray =  │  double*  │  double*  │    ...    │     ...   │  
- *               └───────────┴───────────┴───────────┴───────────┘
- *                     ↓           ↓                        ↓
- *                ┌────────┐   ┌────────┐⬋canary[2]     ┌────────┐
- *                │ size_t │   │ size_t │               │  ...   │
- *              ⬈ ├────────┤   ├────────┤ arraysQt = 2  ├────────┤
- *    canary[0]   │ double │   │ double │⬅ count = 0    │  ...   │
- *                ├────────┤   ├────────┤               ├────────┤
- *    canary[1]   │  ...   │   │  ...   │ canary[3]     │  ...   │
- *              ⬊ ├────────┤   ├────────┤⬋              ├────────┤
- *                │ size_t │   │ size_t │               │  ...   │
- *                └────────┘   └────────┘               └────────┘
- *            │ INIT_SIZE + 2 │INIT_SIZE * 2 + 2 │
- *            │   elements    │elements          │
- */
-        size_t        checkSum() const;
-        STACKERRORS_T ok      () const;
-        STACKERRORS_T realloc ();
-    PROPERTIES
-        size_t count_;
-    //THIS  FIELD HAS TO BE IN THE END OF THE CLASS!
-        size_t   checkSum_;
+    T*     data_;
+    
+    size_t count_;      //< points at first free element
+    size_t currentSize_;
+
+    //I used static, because it is more
+    //natural to type Stack::init_size
+    //rather than type stkInst.init_size
+    static const size_t init_size = 32; 
+
+    friend void stackTorture<T> (Stack<T>&);
+    friend void stackUnitTest<T>();
 };
-#undef PROPERTIES
-#undef PROP_SET
-#undef PROP_GET
 
-    /**
-     Unit test for stack
-     */
-    void stackTorture(bool verbose = false);
+template <typename T>
+Stack<T>::Stack(size_t size):
+    data_        (new T[size]),
+    count_       (0),
+    currentSize_ (size)
+{
+    if (!data_) throw ERR_ALLOC;
+}
 
+template <typename T>
+Stack<T>::Stack(Stack& stk)
+{
+    count_ = stk.count_;
+    currentSize_ = stk.currentSize_;
+    
+    data_ = new T[currentSize_];
+    if (!data_) throw ERR_ALLOC;
+
+    std::copy_n(stk.data_, stk.currentSize_,  data_);
+}
+
+template <typename T>
+Stack<T>::~Stack()
+{
+    delete[] data_; data_ = NULL;
+}
+
+template <typename T>
+void Stack<T>::swap(Stack& stk)
+{
+    //I swap pointers. Is it safe?
+    std::swap(this->data_,        stk.data_);
+    std::swap(this->count_,       stk.count_);
+    std::swap(this->currentSize_, stk.currentSize_);
+}
+
+template <typename T>
+const Stack<T>& Stack<T>::operator = (const Stack& stk)
+{
+    printf("QQQQQQQQ");
+    if (this == &stk) return this;
+
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    //Copy and swap idiom
+    Stack<T>& victim = Stack(stk);
+    swap(victim);
+
+    return *this;
+}
+
+template <typename T>
+void Stack<T>::push(T value)
+{
+    while (count_ + 1 > currentSize_)
+        DSSrealloc();
+    data_[count_++] = value;
+}
+
+template <typename T>
+T    Stack<T>::pop()
+{
+    if (count_ <= 0)
+        throw ERR_UNDERFLOW;
+    return data_[--count_];
+}
+
+template <typename T>
+void Stack<T>::DSSrealloc() 
+{
+    if (currentSize_ * 2 < currentSize_) //< in case of overflow
+        throw ERR_OVERFLOW;
+
+    T* newData = new T[currentSize_ * 2];
+    std::copy_n(data_, currentSize_,  newData);
+    delete[] data_;
+    data_ = newData;
+
+    currentSize_ *= 2;
+}
+
+template <typename T>
+void Stack<T>::dump()   const
+{
+    verify();
+#ifndef NDEBUG
+    std::cout << std::endl;
+    std::cout << "\tStack<" << typeid(T).name() << ">" << std::endl;
+    std::cout << "\t{" << std::endl;
+    std::cout << "\t count = " << count_ << std::endl,
+    std::cout << "\t size  = " << currentSize_  << std::endl,
+    std::cout << "\t data: ["  << data_ << "]" << std::endl;
+
+    for (size_t i = 0; i < count_; i++)
+        std::cout << "\t#" << std::setw(4) << i << " " << data_[i] << std::endl;
+
+    std::cout << "\t}" << std::endl;
 #endif
+}
+
+template <typename T>
+void Stack<T>::verify() const
+{
+    if (!data_)
+        throw ERR_DATANULLPTR;
+    if (count_ < 0)
+        throw ERR_UNDERFLOW;
+    if (count_ + 1 > currentSize_)
+        throw ERR_OVERFLOW;
+}
